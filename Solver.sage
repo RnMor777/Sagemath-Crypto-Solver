@@ -2,7 +2,22 @@ import time
 import timeout_decorator
 import matplotlib.pyplot as plt; plt.rcdefaults()
 import numpy as np
+import os
+from rich.console import Console
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
+from reportlab.lib import colors
 
+fileName = 'report.pdf'
+documentTitle = 'RSA Decoding Report'
+title = 'RSA Decoding Report'
+subTitle = 'Program by Ryan'
+image = 'img.png'
+pdf = canvas.Canvas(fileName)
+pdf.setTitle(documentTitle)
+pdfmetrics.registerFont(TTFont('abc', 'UbuntuMono-R.ttf'))
+console = Console()
 TIME_OUT = 3
 
 # Determines the divisors of p-1
@@ -155,7 +170,49 @@ def phi(n):
         result -= int(result / n)
     return result
 
+def quad_res(N):
+    L = ceil(e^(sqrt(ln(N)*ln(ln(N)))))
+    B = ceil(L^(1/sqrt(2)))
+    T = ceil(L^sqrt(2))
+
+    t0 = ceil(sqrt(N))
+    list_of_as_and_cs = []
+    for k in range(T):
+        a = t0 + k
+        c = power_mod(t0+k,2,N)
+        list_of_as_and_cs.append([a,c,c,[]])
+
+    prime_base = prime_range(B+1)
+
+    for i in range(len(prime_base)):
+        p = prime_base[i]
+        for j in range(len(list_of_as_and_cs)):
+            list_of_as_and_cs[j][3].append(0)
+            while (mod(list_of_as_and_cs[j][2],p) == 0):
+                list_of_as_and_cs[j][2] = list_of_as_and_cs[j][2]/p
+                list_of_as_and_cs[j][3][i] = list_of_as_and_cs[j][3][i] + 1
+
+    list_of_as = []
+    list_of_cs = []
+    list_of_cs_exponents = []
+    for j in range(len(list_of_as_and_cs)):
+        if list_of_as_and_cs[j][2] == 1:
+            list_of_as.append(list_of_as_and_cs[j][0])
+            list_of_cs.append(list_of_as_and_cs[j][1])
+            list_of_cs_exponents.append(list_of_as_and_cs[j][3])
+
+    M = matrix(GF(2),list_of_cs_exponents)
+    list_of_ws = basis(kernel(M))
+
+    for i in range(len(list_of_ws)):
+        a_prod = product([a for a,k in zip(list_of_as,list_of_ws[i]) if k==1])
+        c_prod = product([c for c,k in zip(list_of_cs,list_of_ws[i]) if k==1])
+        if gcd(a_prod - sqrt(c_prod),N) > 1 and gcd(a_prod - sqrt(c_prod),N) < N:
+            return gcd(a_prod - sqrt(c_prod),N)
+
 def driver_rsa ():
+    pfin = 0
+    tot = 0
     # e = int(input("Enter the e value: "))
     # c = int(input("Enter the c value: "))
     N = int(input("Enter the N value: "))
@@ -163,103 +220,126 @@ def driver_rsa ():
     
     print ("\nRSA Analysis\n")
 
-    print ("Pollard P Minus 1:")
-    @timeout_decorator.timeout(TIME_OUT)
-    def pm1():
-        t = time.time()
-        p = pollard_pminus1(N,2,30)
-        t = time.time() - t
-        q = N//p
-        x = [p,q]
-        x.sort()
-        print ("N =", x[0], "*", x[1])
-        print ("time:", "%.3f" % float(t), "seconds", "\n")
-        performance.append(t)
-    try:
-        pm1()
-    except Exception:
-        print ("Time Exceeded\n")
-        performance.append(TIME_OUT)
+    with console.status("[bold green] Pollard P-1") as status:
+        @timeout_decorator.timeout(TIME_OUT)
+        def pm1():
+            t = time.time()
+            p = pollard_pminus1(N,2,30)
+            t = time.time() - t
+            performance.append(t)
+            return p
+        try:
+            pfin = pm1()
+        except Exception:
+            performance.append(TIME_OUT)
+        console.log("Pollard P-1 Complete")
 
-    print ("Fermat V1:")
-    @timeout_decorator.timeout(TIME_OUT)
-    def fem1():
-        t = time.time()
-        p = fermat_factor_v1(N)
-        t = time.time() - t
-        q = N//p
-        x = [p,q]
-        x.sort()
-        print ("N =", x[0], "*", x[1])
-        print ("time:", "%.3f" % float(t), "seconds", "\n")
-        performance.append(t)
-    try:
-        fem1()
-    except Exception:
-        print ("Time Exceeded\n")
-        performance.append(TIME_OUT)
+    with console.status("[bold green] Fermat V1") as status:
+        @timeout_decorator.timeout(TIME_OUT)
+        def fem1():
+            t = time.time()
+            p = fermat_factor_v1(N)
+            t = time.time() - t
+            performance.append(t)
+            return p
+        try:
+            pfin = fem1()
+        except Exception:
+            performance.append(TIME_OUT)
+        console.log("Fermat V1 Complete")
 
-    print ("Fermat V2:")
-    @timeout_decorator.timeout(TIME_OUT)
-    def fem2():
-        t = time.time()
-        p = fermat_factor_v2(N)
-        t = time.time() - t
-        q = N//p
-        x = [p,q]
-        x.sort()
-        print ("N =", x[0], "*", x[1])
-        print ("time:", "%.3f" % float(t), "seconds", "\n")
-        performance.append(t)
-    try:
-        fem2()
-    except Exception:
-        print ("Time Exceeded\n")
-        performance.append(TIME_OUT)
+    with console.status("[bold green] Fermat V2") as status:
+        @timeout_decorator.timeout(TIME_OUT)
+        def fem2():
+            t = time.time()
+            p = fermat_factor_v2(N)
+            t = time.time() - t
+            performance.append(t)
+            return p
+        try:
+            pfin = fem2()
+        except Exception:
+            performance.append(TIME_OUT)
+        console.log("Fermat V2 Completed")
 
-    print ("Euler's Totient: ", end="")
-    @timeout_decorator.timeout(TIME_OUT)
-    def eultot():
-        t = time.time()
-        eulphi = euler_phi(N)
-        t = time.time() - t
-        b = (1+N-eulphi)
-        p = (b + sqrt(b^2-4*1*N))/2
-        q = N//p
-        x = [p,q]
-        x.sort()
-        print (eulphi)
-        print ("N =", x[0], "*", x[1])
-        print ("time:", "%.3f" % float(t), "seconds", "\n")
-        performance.append(t)
-    try:
-        eultot()
-    except Exception:
-        print ("\nTime Exceeded\n")
-        performance.append(TIME_OUT)
+    with console.status("[bold green] Euler's Totient") as status:
+        @timeout_decorator.timeout(TIME_OUT)
+        def eultot():
+            t = time.time()
+            eulphi = euler_phi(N)
+            t = time.time() - t
+            b = (1+N-eulphi)
+            p = (b + sqrt(b^2-4*1*N))/2
+            performance.append(t)
+            return p, eulphi
+        try:
+            pfin, tot = eultot()
+        except Exception:
+            performance.append(TIME_OUT)
+        console.log("Euler's Totient Complete")
 
-    print ("Default Built-in:")
-    @timeout_decorator.timeout(TIME_OUT)
-    def built_solve():
-        t = time.time()
-        fact = factor(N)
-        t = time.time() - t
-        print ("N =", fact)
-        print ("time:", "%.3f" % float(t), "seconds", "\n")
-        performance.append(t)
-    try:
-        built_solve()
-    except Exception:
-        print ("\nTime Exceeded\n")
-        performance.append(TIME_OUT)
+    with console.status("[bold green] Elliptic Curve") as status:
+        @timeout_decorator.timeout(TIME_OUT)
+        def qr():
+            t = time.time()
+            x = ecm.factor(N)
+            t = time.time() - t
+            performance.append(t)
+            x.sort()
+            return int(x[0])
+        try:
+            pfin = qr()
+        except Exception:
+            performance.append(TIME_OUT)
+        console.log("Elliptic Curve Complete")
 
-    objects = ("Pollard", "Fermat V1", "Fermat V2", "Totient", "Built-in")
+    with console.status("[bold green] Built-in") as status:
+        @timeout_decorator.timeout(TIME_OUT)
+        def built_solve():
+            t = time.time()
+            fact = factor(N)
+            t = time.time() - t
+            performance.append(t)
+            return int((str(fact).split("*"))[0])
+        try:
+            pfin = built_solve()
+        except Exception:
+            performance.append(TIME_OUT)
+        console.log("Built-in Complete")
+
+    if (pfin == 0):
+        print ("No Results - Try a higher time out value")
+        exit(1)
+
+    objects = ("Pollard", "Fermat V1", "Fermat V2", "Totient", "E-Curve", "Built-in")
     y_pos = np.arange(len(objects))
     plt.bar(y_pos, performance, align='center', alpha=0.5)
+    for i in range(len(objects)):
+        plt.text(i,performance[i],round(performance[i],4), ha="center")
     plt.xticks(y_pos, objects)
     plt.ylabel("Time Taken (seconds)")
+    plt.xlabel("Algorithm")
     plt.title("Time of factorization algorithm")
-    plt.show()
+    plt.savefig("img.png")
+
+    pdf.setFont('abc', 40)
+    pdf.drawCentredString(300, 770, title)
+    pdf.setFont('abc', 20)
+    pdf.drawCentredString(290, 720, subTitle)
+    pdf.line(30, 700, 550, 700)
+    pdf.drawInlineImage(image, 70, 350, width=440, height=330)
+    pdf.line(30, 340, 550, 340)
+    pdf.drawString (40, 310, "N = "+str(N))
+    pdf.drawString (40, 290, "P = "+str(pfin))
+    pdf.drawString (40, 270, "Q = "+str(N//pfin))
+    pdf.drawString (40, 250, "φ = "+str(tot))
+    pdf.drawString (40, 210, "P-1  = "+str(factor(pfin-1)))
+    pdf.drawString (40, 190, "Q-1  = "+str(factor((N//pfin)-1)))
+
+    pdf.save()
+
+    os.remove("img.png")    
+    os.system("okular report.pdf")
 
 driver_rsa()
 # vim:ft=python
